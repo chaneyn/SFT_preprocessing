@@ -31,6 +31,7 @@ import json
 import xarray as xr
 import pandas as pd
 import copy
+import glob
 mb = 1024*1024
 
 def assemble_domain(comm,jfile):
@@ -38,7 +39,6 @@ def assemble_domain(comm,jfile):
  #define MPI parameters
  rank = comm.Get_rank()
  size = comm.Get_size()
- print('here')
     
  #Read metadata
  metadata = json.load(open(jfile))
@@ -160,44 +160,21 @@ def compute_sfts(comm,jfile):
     
  return
 
-def prepare_netcdf_file(comm,jfile):
+def write_file(metadata,lats,lons,nlat,nlon,bins,nsft):
     
- #Read metadata
- metadata = json.load(open(jfile))
- #Assemble the data to assemble the output dataset
- minlat = metadata['domain']['bbox']['minlat'] + metadata['domain']['res']/2.0
- maxlat = metadata['domain']['bbox']['maxlat'] - metadata['domain']['res']/2.0
- minlon = metadata['domain']['bbox']['minlon'] + metadata['domain']['res']/2.0
- maxlon = metadata['domain']['bbox']['maxlon'] - metadata['domain']['res']/2.0
- nlat = int((maxlat-minlat)/metadata['domain']['res']+1)
- nlon = int((maxlon-minlon)/metadata['domain']['res']+1)
- lats = np.linspace(minlat,maxlat,nlat)
- lons = np.linspace(minlon,maxlon,nlon)
- #Read in the domain summary database
- pck_file = '%s/shp/domain_database.pck' % metadata['output_dir']
- mpdb = pickle.load(open(pck_file,'rb'))
- #Read in and place all the sft databases
- mprange = range(len(mpdb))
- for imp in mprange:
-  mpid = mpdb[imp]['mpid']
-  print(imp,mpid,flush=True)
-  lat = (mpdb[imp]['bbox']['minlat'] + mpdb[imp]['bbox']['maxlat'])/2
-  lon = (mpdb[imp]['bbox']['minlon'] + mpdb[imp]['bbox']['maxlon'])/2
-  ilat = np.argmin(np.abs(lats-lat))
-  ilon = np.argmin(np.abs(lons-lon))
-  pck_file = '%s/mps/%d/sfts_db.pck' % (metadata['output_dir'],mpid)
-  sft_db = pickle.load(open(pck_file,'rb'))
-  if imp == 0:
-   #Create the empty dataset
-   nsft = sft_db['sft'].size
-   sftfct = -9999*np.ones((1,nsft,nlat,nlon))
-   sfts = sft_db['sft'][:]
-   #Assemble binning dictionary
-   bins = sft_db['bins']
-  sftfct[0,:,ilat,ilon] = sft_db['fct'][:]
-  #Prepare xarray dataset
-  time_counter = pd.date_range("%4d-01-01" % metadata['preprocessing_year'], periods=1)
-  ds = xr.Dataset(
+ #Initialize empty array
+ sftfct = -9999*np.ones((1,nsft,nlat,nlon)) 
+ sfts = np.arange(1,nsft+1)
+ #Process and place all the temporary groups of databases
+ workspace = '%s/workspace' % metadata['output_dir']
+ files = glob.glob('%s/*.pck' % workspace)
+ for file in files:
+  odb = pickle.load(open(file,'rb'))
+  #for i in range(odb['ilat'].size):
+  sftfct[0,:,odb['ilat'],odb['ilon']] = odb['sftfct'][:,:]
+ #Prepare xarray dataset
+ time_counter = pd.date_range("%4d-01-01" % metadata['preprocessing_year'], periods=1)
+ ds = xr.Dataset(
         data_vars=dict(
             sftfct=(["time_counter","sft","lat","lon"],sftfct.astype(np.float32),
                     dict(long_name="SFT fractions",name="sfcfct",units="-",_FillValue=-9999)),
@@ -222,11 +199,68 @@ def prepare_netcdf_file(comm,jfile):
         else:
             data = bins[var]['min']
             long_name = "%s" % (var,)
-            ds["%s" % (var,)] = (["sft"],data.astype(np.float32),
+            ds["%s" % (var,)] = (["sft"],data.astype(np.int32),
                     dict(long_name=long_name,units="-",_FillValue=-9999))
  ofile = '%s/SFTmap_%04d.nc' % (metadata['output_dir'],metadata['preprocessing_year'])
  os.system('rm -f %s' % ofile)
  ds.to_netcdf(ofile)
+
+ return
+
+def prepare_netcdf_file(comm,jfile):
+  
+ rank = comm.Get_rank()
+ size = comm.Get_size()
+ #Read metadata
+ metadata = json.load(open(jfile))
+ #Assemble parameters to assemble the output dataset
+ minlat = metadata['domain']['bbox']['minlat'] + metadata['domain']['res']/2.0
+ maxlat = metadata['domain']['bbox']['maxlat'] - metadata['domain']['res']/2.0
+ minlon = metadata['domain']['bbox']['minlon'] + metadata['domain']['res']/2.0
+ maxlon = metadata['domain']['bbox']['maxlon'] - metadata['domain']['res']/2.0
+ nlat = int((maxlat-minlat)/metadata['domain']['res']+1)
+ nlon = int((maxlon-minlon)/metadata['domain']['res']+1)
+ lats = np.linspace(minlat,maxlat,nlat)
+ lons = np.linspace(minlon,maxlon,nlon)
+ workspace = '%s/workspace' % metadata['output_dir']
+ if rank == 0:
+  #Create temporary workspace
+  os.system('rm -rf %s' % workspace)
+  os.system('mkdir -p %s' % workspace)
+ comm.Barrier()
+ #Have each rank process and write the info
+ #Read in the domain summary database
+ pck_file = '%s/shp/domain_database.pck' % metadata['output_dir']
+ mpdb = pickle.load(open(pck_file,'rb'))
+ #Read in and place all the sft databases
+ mprange = range(len(mpdb))
+ odb = {'ilat':[],'ilon':[],'sftfct':[]}
+ for imp in mprange[rank::size]:
+  mpid = mpdb[imp]['mpid']
+  lat = (mpdb[imp]['bbox']['minlat'] + mpdb[imp]['bbox']['maxlat'])/2
+  lon = (mpdb[imp]['bbox']['minlon'] + mpdb[imp]['bbox']['maxlon'])/2
+  ilat = np.argmin(np.abs(lats-lat))
+  ilon = np.argmin(np.abs(lons-lon))
+  pck_file = '%s/mps/%d/sfts_db.pck' % (metadata['output_dir'],mpid)
+  sft_db = pickle.load(open(pck_file,'rb'))
+  odb['ilat'].append(ilat)
+  odb['ilon'].append(ilon)
+  odb['sftfct'].append(sft_db['fct'][:])
+  if imp == 0:
+   #Save info for netcdf file creation
+   bins = sft_db['bins']
+   nsft = sft_db['sft'].size
+ for var in odb:
+    odb[var] = np.array(odb[var])
+ #Write out temporary database
+ pickle.dump(odb,open('%s/%d.pck' % (workspace,rank),'wb'),pickle.HIGHEST_PROTOCOL)
+ comm.Barrier()
+
+ if rank == 0:
+  write_file(metadata,lats,lons,nlat,nlon,bins,nsft)
+  #Remove temporary workspace
+  os.system('rm -rf %s' % workspace)
+ comm.Barrier()
     
  return
 
@@ -567,10 +601,10 @@ def Extract_Land_Cover_CCI_Orchidee(mpdb,workspace,metadata,mpid,log):
 
  #clean up at -180/180 spurious artifacts
  if ((minx > 178.0) | (minx < -178.0)):
-    print('here!')
     idx1 = gpfts.index('GRASS-NAT')
     idx2 = gpfts.index('WATER_INLAND')
-    m = (data[idx1,:,:]==14) & (data[idx2,:,:]==86)
+    #print(np.unique(data[idx1,:,:]),np.unique(data[idx2,:,:]))
+    m = (data[idx1,:,:]==0.14) & (data[idx2,:,:]==0.86)
     data[idx1,:,:][m] = -9999
     data[idx2,:,:][m] = -9999
 

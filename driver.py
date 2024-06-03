@@ -37,9 +37,8 @@ def main(argv):
         print("(r%d) SFTs: Compute SFTs" % rank,flush=True)
         preprocessing.compute_sfts(comm,jfile)
    elif pstage == 'finalize_netcdf':
-        if rank == 0:
-         print("(r%d) SFTs: Finalize NetCDF file" % rank,flush=True)
-         preprocessing.prepare_netcdf_file(comm,jfile)
+        print("(r%d) SFTs: Finalize NetCDF file" % rank,flush=True)
+        preprocessing.prepare_netcdf_file(comm,jfile)
         comm.Barrier()
    else:
         print("The pstage provided is not an option")
