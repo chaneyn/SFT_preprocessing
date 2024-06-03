@@ -76,3 +76,5 @@ The variables and binning information used for each variable can be changed with
 # Output NetCDF file
 
 * The `sfcfct` array defines the fractional coverage of each SFT per grid cell. The sum of sfcfct per grid cell should be 1. 
+* The bin edges of the SFTs for each chosen continuous variable in the JSON file are included in the NetCDF file (min and max).
+* The class value of the SFTs for each chosen class variable in the JSON file are included in the NetCDF file. 
