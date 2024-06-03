@@ -29,7 +29,7 @@ The JSON file defines the domain, the location of the datasets, and the binning 
 The lat/lon boundaries and resolution defined in the json file are used to create a shapefile define the macroscale polygons (i.e., regular grid cells) over the selected domain. The land cover data is then used to determine grid cells that are only ocean; the final result is a corrected shapefile with only grid cells that have land.
 
 ```
-mpirun -n 4 python -n driver.py -f json/test_region.json -s define_domain
+mpirun -n 4 python driver.py -f json/test_region.json -s define_domain
 ```
 
 **2. Preprocess datasets**
@@ -37,7 +37,7 @@ mpirun -n 4 python -n driver.py -f json/test_region.json -s define_domain
 Each grid cell is processed and the corresponding data (e.g., elevation) are extracted at the preprocessing resolution (e.g., 3 arcsec). A database is made for each macroscale polygon that contains land over the domain
 
 ```
-mpirun -n 4 python -n driver.py -f json/test_region.json -s preprocess_datasets
+mpirun -n 4 python driver.py -f json/test_region.json -s preprocess_datasets
 ```
 
 **3. Compute SFTs**
@@ -45,7 +45,7 @@ mpirun -n 4 python -n driver.py -f json/test_region.json -s preprocess_datasets
 For each grid cell, the preprocessed data is read in and binned using a n-dimensional histogram. The SFTs are then defined from the histogram. Note that the defined binning of the histogram is the same for all grid cells ensuring the SFT definition is the same for all grid cells. The SFT fractions are calculated from the histogram and each fine-scale pixel (i.e., preprocessing resolution) is asigned a SFT and saved within the given macroscale polygons directory as a geotiff titled `sfts.tif`
 
 ```
-mpirun -n 4 python -n driver.py -f json/test_region.json -s compute_sfts
+mpirun -n 4 python driver.py -f json/test_region.json -s compute_sfts
 ```
 
 **3. Finalize NetCDF**
@@ -53,7 +53,7 @@ mpirun -n 4 python -n driver.py -f json/test_region.json -s compute_sfts
 The SFT databases calculated previously per grid cell are read in and used to assemble a domain NetCDF file that contains the fractional coverage of each grid cell which can then be readily Orchidee. 
 
 ```
-mpirun -n 4 python -n driver.py -f json/test_region.json -s finalize_netcdf
+mpirun -n 4 python driver.py -f json/test_region.json -s finalize_netcdf
 ```
 
 # JSON file parameters
