@@ -72,6 +72,18 @@ The variables and binning information used for each variable can be changed with
 * Whether the variable is continuous (e.g., elevation) or class (e.g., pft) needs to be defined.
 * For continuous data there must be at least 2 bin edges defined per variable; for class data there must be at least 1 bin value defined. 
 * The binning can be linear or non-linear; however, the minimum and maximum values that can be found need to be bound by the defined bins if not fine-scale pixels can be excluded. 
+* The current following variables can be used for binning: 
+ * Elevation (elev; meters)
+ * PFTs (pft; 1-15 are the ORCHIDEE PFTs, 16 is permanent snow/ice, and 17 is water)
+ * Slope (slope; m/m)
+ * Aspect S-N (aspect_sn)
+ * Aspect W-E (aspect_ew)
+ * Clay (clay; %)
+ * Sand (sand; %)
+ * Silt (silt; %)
+ * South-North (sn)
+ * West-East (ew)
+
 
 # Output NetCDF file
 
