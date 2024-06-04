@@ -1,0 +1,23 @@
+{
+"output_dir":"/home/nchaney/storage/test_alps",
+"domain":{"bbox":{"minlat":45.5,"maxlat":46.5,"minlon":6.0,"maxlon":7.0},
+          "res":1.0},
+"preprocessing_resolution":0.000833333333333,
+"preprocessing_year":2020,
+"input_files":{"elev":"/home/nchaney/storage/data/MERIT/elv/elv.vrt",
+               "gptfs_file":"/home/nchaney/storage/data/CCI_PFT_v208/ESACCI-LC-L4-PFT-Map-300m-P1Y-%d-v2.0.8.nc",
+               "kg_file":"/home/nchaney/storage/data/Orchidee_PFTs/KG_720x1440.nc",
+               "still_file":"/home/nchaney/storage/data/Orchidee_PFTs/C4frac_720x1440.nc",
+               "hydrolakes_file":"/home/nchaney/storage/data/HydroLakes/HydroLAKES_polys_v10_shp",
+               "luh_file":"/home/nchaney/storage/data/Orchidee_PFTs/LUH2v11_1992-2022_720x1440.nc",
+               "clay":"/home/nchaney/storage/data/soilgrids/CLYPPT_M_sl1_250m_ll.tif",
+               "sand":"/home/nchaney/storage/data/soilgrids/SNDPPT_M_sl1_250m_ll.tif",
+               "silt":"/home/nchaney/storage/data/soilgrids/SLTPPT_M_sl1_250m_ll.tif",
+               "om":"/home/nchaney/storage/data/soilgrids/ORCDRC_M_sl1_250m_ll.tif"},
+"histogram_info":{"sn":{"bins":[0,0.5,1],"type":"continuous"},
+                  "ew":{"bins":[0,0.5,1],"type":"continuous"},
+                  "elev":{"bins":[0,1000,2000,5000],"type":"continuous"},
+                  "aspect_sn":{"bins":[-1,0,1],"type":"continuous"},
+                  "clay":{"bins":[0,20,40],"type":"continuous"},
+                  "pft":{"bins":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17],"type":"class"}}
+}

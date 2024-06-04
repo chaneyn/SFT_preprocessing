@@ -103,12 +103,6 @@ def preprocess_datasets(comm,jfile):
     
   #Clean up directory
   os.system('rm -rf %s/CCI_orchidee' % workspace)
-  #files = ['acc_latlon.tif','f11_latlon.tif','psisat_latlon.tif','texture_class_latlon.tif','thetas_latlon.tif',
-  #        'admin_latlon.tif','qtz_latlon.tif','theta1500_latlon.tif','basins_latlon.tif','ksat_latlon.tif',
-  #        'theta33_latlon.tif','bb_latlon.tif','dsat_latlon.tif','om_latlon.tif','silt_latlon.tif',
-  #        'thetar_latlon.tif']
-  #for file in files:
-  #  os.system('rm %s/%s' % (workspace,file))
 
  return
 
@@ -171,7 +165,8 @@ def write_file(metadata,lats,lons,nlat,nlon,bins,nsft):
  for file in files:
   odb = pickle.load(open(file,'rb'))
   #for i in range(odb['ilat'].size):
-  sftfct[0,:,odb['ilat'],odb['ilon']] = odb['sftfct'][:,:]
+  if odb['ilat'].size >= 1:sftfct[0,:,odb['ilat'],odb['ilon']] = odb['sftfct'][:]
+  #elif odb['ilat'].size>2:sftfct[0,:,odb['ilat'][0],odb['ilon'][0]] = odb['sftfct'][:]
  #Prepare xarray dataset
  time_counter = pd.date_range("%4d-01-01" % metadata['preprocessing_year'], periods=1)
  ds = xr.Dataset(
@@ -203,6 +198,8 @@ def write_file(metadata,lats,lons,nlat,nlon,bins,nsft):
                     dict(long_name=long_name,units="-",_FillValue=-9999))
  ofile = '%s/SFTmap_%04d.nc' % (metadata['output_dir'],metadata['preprocessing_year'])
  os.system('rm -f %s' % ofile)
+ ds.coords['lon'] = (ds.coords['lon'] + 360) % 360
+ ds = ds.sortby(ds.lon)
  ds.to_netcdf(ofile)
 
  return
@@ -592,7 +589,7 @@ def Extract_Land_Cover_CCI_Orchidee(mpdb,workspace,metadata,mpid,log):
   fin = 'NETCDF:"%s":%s' % (gpft_file,gpft)
   fout = '%s/GPFT_%s.tif' % (cdir,gpft)
   cache = int(psutil.virtual_memory().available*0.7/mb)
-  os.system('gdalwarp -t_srs \'%s\' -ot Int16 -dstnodata -9999 -r near -tr %.16f %.16f -te %.16f %.16f %.16f %.16f --config GDAL_CACHEMAX %i %s %s >> %s 2>&1' % (lproj,res,res,minx,miny,maxx,maxy,cache,fin,fout,log))
+  os.system('gdalwarp -t_srs \'%s\' -ot Int16 -dstnodata -9999 -tr %.16f %.16f -te %.16f %.16f %.16f %.16f --config GDAL_CACHEMAX %i %s %s >> %s 2>&1' % (lproj,res,res,minx,miny,maxx,maxy,cache,fin,fout,log))
   if gpft in ['LAND','WATER']:continue
   data.append(rasterio.open(fout).read(1).astype(np.float32))
  data = np.array(data)
@@ -607,7 +604,9 @@ def Extract_Land_Cover_CCI_Orchidee(mpdb,workspace,metadata,mpid,log):
     m = (data[idx1,:,:]==0.14) & (data[idx2,:,:]==0.86)
     data[idx1,:,:][m] = -9999
     data[idx2,:,:][m] = -9999
-
+ #Remove south of -60
+ if (maxy < -60.0):
+    data[:,:,:] = -9999
  #1.2 Sample per 90 meter pixel to account for variability from CCI
  pft_map = random_disaggregation_landcover(data)
     
@@ -621,7 +620,7 @@ def Extract_Land_Cover_CCI_Orchidee(mpdb,workspace,metadata,mpid,log):
  fin = kg_file
  fout = '%s/kg.nc' % cdir
  cache = int(psutil.virtual_memory().available*0.7/mb)
- os.system('gdalwarp -ot Int32 -of netcdf -t_srs \'%s\' -dstnodata -9999 -r near -tr %.16f %.16f -te %.16f %.16f %.16f %.16f --config GDAL_CACHEMAX %i %s %s >> %s 2>&1' % (lproj,res,res,minx,miny,maxx,maxy,cache,fin,fout,log))
+ os.system('gdalwarp -ot Int32 -of netcdf -t_srs \'%s\' -dstnodata -9999 -tr %.16f %.16f -te %.16f %.16f %.16f %.16f --config GDAL_CACHEMAX %i %s %s >> %s 2>&1' % (lproj,res,res,minx,miny,maxx,maxy,cache,fin,fout,log))
 
  #2.2 Reduce Koppen Geiger classes
  fp = nc.Dataset(fout)
@@ -653,7 +652,7 @@ def Extract_Land_Cover_CCI_Orchidee(mpdb,workspace,metadata,mpid,log):
  fin = still_file
  fout = '%s/still.nc' % cdir
  cache = int(psutil.virtual_memory().available*0.7/mb)
- os.system('gdalwarp -ot Float32 -of netcdf -t_srs \'%s\' -dstnodata -9999 -r near -tr %.16f %.16f -te %.16f %.16f %.16f %.16f --config GDAL_CACHEMAX %i %s %s >> %s 2>&1' % (lproj,res,res,minx,miny,maxx,maxy,cache,fin,fout,log))
+ os.system('gdalwarp -ot Float32 -of netcdf -t_srs \'%s\' -dstnodata -9999 -tr %.16f %.16f -te %.16f %.16f %.16f %.16f --config GDAL_CACHEMAX %i %s %s >> %s 2>&1' % (lproj,res,res,minx,miny,maxx,maxy,cache,fin,fout,log))
 
  #3.2 Process Still C4 fraction data
  fp = nc.Dataset(fout)
@@ -713,11 +712,11 @@ def Extract_Land_Cover_CCI_Orchidee(mpdb,workspace,metadata,mpid,log):
  m = pft_map == gpfts.index('BARE')
  pfts[m] = 1
  m = pft_map == gpfts.index('WATER_INLAND')
- pfts[m] = 1
+ pfts[m] = 17
  m = (pft_map == gpfts.index('WATER_OCEAN')) & (data_hydrolakes == 1) #Constrain using hydrolakes to include the big lakes (classified as ocean in CCI)
- pfts[m] = 1
+ pfts[m] = 17
  m = pft_map == gpfts.index('SNOWICE')
- pfts[m] = 1
+ pfts[m] = 16
  m = pft_map == gpfts.index('BUILT')
  pfts[m] = 1
  #m = pft_map == -9999
@@ -943,7 +942,6 @@ def correct_domain_decomposition(comm,metadata):
   npx = np.sum((mask == mpid) & (pft != -9999))
   #odb[cid] = min(npx_mask,npx_pft) #only land cover decides what stays and goes
   odb[mpid] = npx
-  print(npx)
     
   #Clean up directory
   os.system('rm -rf %s/CCI_orchidee' % workspace)
